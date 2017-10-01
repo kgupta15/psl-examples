@@ -1,0 +1,3 @@
+10: Knows(P1,P2) & Lives(P1,L) -> Lives(P2,L) ^2
+10: Knows(P2,P1) & Lives(P1,L) -> Lives(P2,L) ^2
+2: ~Lives(P,L) ^2

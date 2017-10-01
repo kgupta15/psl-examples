@@ -1,0 +1,15 @@
+predicates:
+  Person/1: closed
+  Location/1: closed
+  Knows/2: closed
+  Lives/2: open
+
+observations:
+  Knows : ../data/knows_obs.txt
+  Lives : ../data/lives_obs.txt
+
+targets: 
+  Lives : ../data/lives_targets.txt
+
+truth: 
+  Lives : ../data/lives_truth.txt
