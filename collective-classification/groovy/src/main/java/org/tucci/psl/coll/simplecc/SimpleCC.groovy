@@ -1,4 +1,4 @@
-package org.tucci.coll.classif.simplecc;
+package org.tucci.psl.coll.simplecc;
 
 import org.linqs.psl.application.inference.MPEInference;
 import org.linqs.psl.config.ConfigBundle;
