@@ -1,4 +1,4 @@
-package org.tucci.psl.coll.link.simplelp;
+package org.tucci.psl.link.simplelp;
 
 import org.linqs.psl.application.inference.MPEInference;
 import org.linqs.psl.config.ConfigBundle;
