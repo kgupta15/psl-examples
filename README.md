@@ -1,5 +1,5 @@
-# psl-model
-Probabilistic Soft Logic based models for given data
+# psl-examples
+Probabilistic Soft Logic based examples models for given data
 
 ### How to run a PSL based Model
 
