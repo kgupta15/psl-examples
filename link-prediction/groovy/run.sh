@@ -1,7 +1,7 @@
 #!/bin/bash
 
 readonly CLASSPATH_FILE='classpath.out'
-readonly TARGET_CLASS='org.linqs.psl.example.easylp.EasyLP'
+readonly TARGET_CLASS='org.tucci.psl.coll.link.SimpleLP'
 
 FETCH_COMMAND=''
 
