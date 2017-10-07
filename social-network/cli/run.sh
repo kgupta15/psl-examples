@@ -2,7 +2,7 @@
 
 readonly JAR_URL='https://linqs-data.soe.ucsc.edu/maven/repositories/psl-releases/org/linqs/psl-cli/CANARY/psl-cli-CANARY.jar'
 readonly JAR_FILE='psl-cli-CANARY.jar'
-readonly BASE_NAME='entity_res'
+readonly BASE_NAME='social_network'
 
 FETCH_COMMAND=''
 
