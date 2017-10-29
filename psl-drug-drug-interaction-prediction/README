@@ -1,0 +1,25 @@
+This repository contains the datasets and code accompanying our paper “A probabilistic approach for collective similarity-based drug–drug interaction prediction.” See http://bioinformatics.oxfordjournals.org/content/32/20/3175.short for full details.
+
+If you use this code in your work, please cite: 
+
+@article{sridhar2016probabilistic,
+  title={A probabilistic approach for collective similarity-based drug--drug interaction prediction},
+  author={Sridhar, Dhanya and Fakhraei, Shobeir and Getoor, Lise},
+  journal={Bioinformatics},
+  volume={32},
+  number={20},
+  pages={3175--3182},
+  year={2016},
+  publisher={Oxford Univ Press}
+}
+
+The code uses our Probabilistic Soft Logic (PSL) framework: https://github.com/linqs/psl/wiki
+
+Dependencies: You need Java (https://java.com/en/download/) and Maven (http://maven.apache.org/download.html) in order to run the PSL experiments.
+
+You can run cross-fold validation experiments across all datasets reported in our paper with the following command:
+./run_cv.sh DrugInteractionPrediction
+
+AUC and AUPR metrics will be reported per fold in result files created under “./output/psl”.
+
+As described in the paper, the drug indices in dataset 2 can be mapped back to DrugBank - use the DrugBankIDs file. The row index is exactly the drug index and the entry in that row is the DrugBank ID.
