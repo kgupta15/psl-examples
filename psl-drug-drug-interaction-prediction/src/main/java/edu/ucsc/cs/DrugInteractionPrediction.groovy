@@ -43,6 +43,11 @@ import com.google.common.collect.Iterables
 class DrugInteractionPrediction {
 	Logger log = LoggerFactory.getLogger(this.class);
 
+	/**
+	 * DEFINES k-fold cross-validation
+	 * stratified cross-validation refers to the process of rearranging
+	 * the data as to ensure each fold is a good representative of the whole.
+	 */
 	class DrugInteractionFold {
 		public int cvFold;
 		public int wlFold;
@@ -65,6 +70,9 @@ class DrugInteractionPrediction {
 
 	}
 
+	/**
+	 * DEFINES experiment parameter definition
+	 */
 	class DrugInteractionExperiment {
 		public ConfigManager cm;
 		public ConfigBundle cb;
@@ -86,8 +94,17 @@ class DrugInteractionPrediction {
 
 	}
 
+	/**
+	 * DEFINES resulting parameters
+	 * auc : Area under ROC Curve
+	 * aupr : Area under PR Curve
+	 * method: First ensure that the 5 folds are all stratified
+	 * (e.g. they all are equally distributed with respect to the originak sample distribution).
+	 * Then, after training some classifier, calculate the AUC the
+	 * classifier's prediction achieves for each of the 5 folds.
+	 */
 	class DrugInteractionEvalResults {
-    // Creating the variables to save the results of each fold
+    	// Creating the variables to save the results of each fold
 	    public double[] AUC_Folds;
 	    public double[] AUPR_P_Folds;
 	    public double[] AUPR_N_Folds;
@@ -97,9 +114,13 @@ class DrugInteractionPrediction {
 	    	this.AUPR_P_Folds = new double[folds+1];
 	    	this.AUPR_N_Folds = new double[folds+1];
     	}
-    } 
+    }
 
 
+	/**
+	 * DEFINES config information for the experiment
+	 * returns `config` object with all information
+	 */
     def setupConfig(numFolds, numDrugs, experimentName, blocking_k, blocking_type, interaction_type, createDS){
     	DrugInteractionExperiment config = new DrugInteractionExperiment();
     	config.cm = ConfigManager.getManager();
@@ -125,6 +146,9 @@ class DrugInteractionPrediction {
 
     }
 
+	/**
+	 * DEFINES datastore location
+	 */
     def setupDataStore(config) {
     	String dbpath = "/tmp/psl_fsbio_collective";
     	DataStore data = new RDBMSDataStore(new H2DatabaseDriver(Type.Disk, dbpath, config.createNewDataStore), config.cb);
@@ -132,6 +156,12 @@ class DrugInteractionPrediction {
     	return data
     }
 
+	/**
+	 * DEFINES PSL rules
+	 * rules are based on similarity condition,
+	 * that is, if two drugs are similar and one other drug is similar to one of previous pair,
+	 * then all drugs are similar and hence interaction is possible
+	 */
     def defineModel(config, data, m){
 
     	m.add predicate : "ATCSimilarity" , types:[ConstantType.UniqueID, ConstantType.UniqueID]
@@ -163,8 +193,11 @@ class DrugInteractionPrediction {
 
 	}
 
-	
-	def loadData(data,config) { 
+
+	/**
+	 * DEFINES loads data, creates partitions
+	 */
+	def loadData(data,config) {
 
 	    // Loading the data
 	    // ================
@@ -174,7 +207,7 @@ class DrugInteractionPrediction {
 
 	    def insert;
 	    def simDir = config.base_dir + config.experiment_name + java.io.File.separator;
-	    
+
 	    for (Predicate p : [ATCSimilarity, distSimilarity, seqSimilarity, ligandSimilarity, GOSimilarity, SideEffectSimilarity, chemicalSimilarity])
 	    {
 	    	log.debug("Reading " + p.getName());
@@ -184,7 +217,12 @@ class DrugInteractionPrediction {
 	}
 
 
-
+	/**
+	 * DEFINES similarity data loading,
+	 * reads triad target similarity data
+	 * wlfold : k-folds for weight learning
+	 * cvfold : k-folds for cross-validation
+	 */
 	def loadSimilarityData(config, data, df){
 		def cvfold = df.cvFold;
 		def wlfold = df.wlFold
@@ -217,6 +255,9 @@ class DrugInteractionPrediction {
 
 	}
 
+	/**
+	 * DEFINES labelling
+	 */
 	def resetDataForFold(config, data, df){
 		def cvFold = df.cvFold;
 		def wlFold = df.wlFold;
@@ -234,10 +275,14 @@ class DrugInteractionPrediction {
 
 	}
 
+	/**
+	 * DEFINES
+	 *
+	 */
 	def blockSimilarityData(config, data, df){
 		def cvfold = df.cvFold;
 		def wlfold = df.wlFold;
-		
+
 		TriadBlocking triadBlock = new TriadBlocking();
 
 		log.debug("\n-------------------");
@@ -249,7 +294,7 @@ class DrugInteractionPrediction {
 			data.deletePartition(data.getPartition(df.wlSim));
 			data.deletePartition(data.getPartition(df.cvSim));
 		}
-		
+
 		df.cvSim = data.getPartition('cvsim' + cvfold);
 		df.wlSim = data.getPartition('wlsim' + wlfold);
 
@@ -257,7 +302,7 @@ class DrugInteractionPrediction {
 		Database getSimilarities = data.getDatabase(data.getPartition("simDummy" + cvfold), readSimilarities);
 
 		//Dummy dbs for wl train, wl test, cv train, cv test for more involved blocking techniques - DS
-		
+
 		Database wlTrainLinks = data.getDatabase(data.getPartition("wlTrainDummy" + wlfold ), df.wlTrain);
 		Database wlTestLinks = data.getDatabase(data.getPartition("wltestdummy" + wlfold), df.wlTruth);
 
@@ -306,13 +351,13 @@ class DrugInteractionPrediction {
 			// Inserting them into the partition - SF
 			def cvInsert = data.getInserter(p, df.cvSim)
 			def wlInsert = data.getInserter(p, df.wlSim)
-			Iterator<GroundAtom> itrSimilarities = cvBlockedSim.iterator();	
+			Iterator<GroundAtom> itrSimilarities = cvBlockedSim.iterator();
 			while (itrSimilarities.hasNext()){
 				GroundAtom itemSimilarity = itrSimilarities.next();
 				cvInsert.insertValue(itemSimilarity.getValue(), itemSimilarity.getArguments());
 			}
 
-			itrSimilarities = wlBlockedSim.iterator();	
+			itrSimilarities = wlBlockedSim.iterator();
 			while (itrSimilarities.hasNext()){
 				GroundAtom itemSimilarity = itrSimilarities.next();
 				wlInsert.insertValue(itemSimilarity.getValue(), itemSimilarity.getArguments());
@@ -328,6 +373,9 @@ class DrugInteractionPrediction {
 
 	}
 
+	/**
+	 * DEFINES interaction data loading, going through folds data
+	 */
 	def loadInteractionsData(config, data, df, isSupervisedMode){
 		def cvfold = df.cvFold;
 		def wlfold = df.wlFold;
@@ -335,7 +383,7 @@ class DrugInteractionPrediction {
 		def interactions_ids = 'interactsids.csv'
 		def interactions_positive = 'interacts_positives.csv'
 		def interactions_negative = 'interacts_negatives.csv'
-		
+
 		def cvlabels = 'cvlabels' + cvfold
 		def cvwrite = 'cvwrite' + cvfold
 		def cvread = 'cvread' + cvfold
@@ -391,7 +439,7 @@ class DrugInteractionPrediction {
 			log.debug(current_interactions_dir);
 			if ((j!=cvfold) && (j!=wlfold))
 			{
-				
+
 				InserterUtils.loadDelimitedData(insertWLValid, current_interactions_dir + interactions_ids);
 				InserterUtils.loadDelimitedData(insertCVValid, current_interactions_dir + interactions_ids);
 
@@ -428,12 +476,12 @@ class DrugInteractionPrediction {
 
 			InserterUtils.loadDelimitedData(insertWLTest, train_interactions_dir + interactions_ids);
 
-			
+
 
 		}else{
 			InserterUtils.loadDelimitedDataTruth(insertCVTrain, train_interactions_dir + interactions_positive);
 			InserterUtils.loadDelimitedData(insertCVTest, train_interactions_dir + interactions_negative);
-			
+
 			InserterUtils.loadDelimitedDataTruth(insertWLLabels, train_interactions_dir + interactions_positive);
 			InserterUtils.loadDelimitedData(insertWLTest, train_interactions_dir + interactions_ids);
 		}
@@ -452,7 +500,12 @@ class DrugInteractionPrediction {
 		InserterUtils.loadDelimitedData(insertCVTest, holdout_interactions_dir + interactions_ids);
 	}
 
-	def learnWeights(m, data, config, df, learnerOption){ 
+
+	/**
+	 * DEFINES weight learning process
+	 * uses MaxLikelihoodMPE algo for it
+	 */
+	def learnWeights(m, data, config, df, learnerOption){
 
 	    /// Weight Learning
 	    // ===============
@@ -465,20 +518,20 @@ class DrugInteractionPrediction {
             for(Rule r : m.getRules()){
             	if ((r instanceof WeightedRule)){
             		Weight w = new PositiveWeight(config.initialWeight);
-                	r.setWeight(w);	
+                	r.setWeight(w);
             	}
             }
         }
 
 	    Database dbWLTrain = data.getDatabase(df.wlTest, config.closedPredicatesInference, df.wlTrain, df.wlSim);
 	    Database dbWLLabels = data.getDatabase(df.wlTruth, config.closedPredicatesTruth);
-	    
+
 
 	    def wLearn = new MaxLikelihoodMPE(m,dbWLTrain,dbWLLabels,config.cb);
 	    wLearn.learn();
 	    wLearn.close();
 
-	    
+
 
 	    dbWLTrain.close();
 	    dbWLLabels.close();
@@ -487,28 +540,35 @@ class DrugInteractionPrediction {
 	    println m;
 	}
 
-  // Inferring
-  // =========
-	  def runInference(m,data,config,df, testPartition, evidencePartition, simPartition) {
-	  	def fold = df.cvFold.toString(); 
-	  	def timeNow = new Date();
-	  	log.debug("Fold "+ fold +" Inferring: " + timeNow);
+	// Inferring
+	// =========
+	/**
+	* DEFINES inference on data
+	* uses MPE Inference algorithm
+	*/
+	def runInference(m,data,config,df, testPartition, evidencePartition, simPartition) {
+		def fold = df.cvFold.toString();
+		def timeNow = new Date();
+		log.debug("Fold "+ fold +" Inferring: " + timeNow);
 
-	    Database dbCVTrain = data.getDatabase(testPartition, config.closedPredicatesInference , evidencePartition, simPartition);
+		Database dbCVTrain = data.getDatabase(testPartition, config.closedPredicatesInference , evidencePartition, simPartition);
 
-	    MPEInference mpe = new MPEInference(m, dbCVTrain, config.cb);
-	    mpe.mpeInference();
-	    mpe.close();
-	    mpe.finalize();
-	    dbCVTrain.close();
+		MPEInference mpe = new MPEInference(m, dbCVTrain, config.cb);
+		mpe.mpeInference();
+		mpe.close();
+		mpe.finalize();
+		dbCVTrain.close();
 
-	    timeNow = new Date();
-	    log.debug("Fold "+ fold +" End: "+timeNow);
-	    log.debug("-------------------");
+		timeNow = new Date();
+		log.debug("Fold "+ fold +" End: "+timeNow);
+		log.debug("-------------------");
 	}
 
-
-	def evaluateResults(data,config,df,de, truthPartition, predictionPartition, writeToFile){ 
+	/**
+	 * DEFINES evaluation of result
+	 *	uses AUPRC, NegAUPRC & Area-under-ROC
+	 */
+	def evaluateResults(data,config,df,de, truthPartition, predictionPartition, writeToFile){
 
 	    //Begin Evaluate
 	    //==============
@@ -553,10 +613,13 @@ class DrugInteractionPrediction {
 	      labelsDB.close();
 	  }
 
-	  def outputResultsCSV(interactionType, experimentName, array, resultName){
-	  	BufferedWriter writer = null;
+	/**
+	 * DEFINES output print on `/output/..` files
+	 */
+	def outputResultsCSV(interactionType, experimentName, array, resultName){
+		BufferedWriter writer = null;
 		String resultsFile = "./output/psl/" + resultName + '_' + interactionType + '_' + experimentName;
-                
+
 		try {
 			writer = new BufferedWriter(new FileWriter(resultsFile));
 			StringBuilder output = new StringBuilder();
@@ -564,86 +627,92 @@ class DrugInteractionPrediction {
 				output.append(d+',');
 			}
 			writer.append(output.toString());
-            writer.flush();
+			writer.flush();
 
-        } catch (Exception e) {
+		} catch (Exception e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-	  }
+	}
 
-	  def runExperiment(numDrugs, numFolds, experimentName, blockingNum, blockingType, interactionType, createDS){
-	  	
-	  	def config = this.setupConfig(numFolds, numDrugs, experimentName, blockingNum, blockingType, interactionType, createDS);
-	    def data = this.setupDataStore(config);
-	    PSLModel m = new PSLModel(this, data);
+	/**
+	 * DEFINES processing config file and running experiment using it
+	 */
+	def runExperiment(numDrugs, numFolds, experimentName, blockingNum, blockingType, interactionType, createDS){
 
-	    this.defineModel(config, data, m);
-	    DrugInteractionEvalResults de = new DrugInteractionEvalResults(config.numFolds);
+		def config = this.setupConfig(numFolds, numDrugs, experimentName, blockingNum, blockingType, interactionType, createDS);
+		def data = this.setupDataStore(config);
+		PSLModel m = new PSLModel(this, data);
 
-	    if(config.createNewDataStore){
+		this.defineModel(config, data, m);
+		DrugInteractionEvalResults de = new DrugInteractionEvalResults(config.numFolds);
+
+		if(config.createNewDataStore){
 			this.loadData(data, config);
 		}
 
-	    for(int fold = 1; fold <= config.numFolds; fold++){
-	    	def wl = (fold % config.numFolds) + 1
-	    	DrugInteractionFold df = new DrugInteractionFold(fold, wl);
-	    	
-	    	if(config.createNewDataStore){
-	    		this.loadInteractionsData(config,data, df, true);
-	    		this.blockSimilarityData(config, data, df);
-	    	}
-	    	else{
-	    		this.resetDataForFold(config, data, df);
-	    	}
+		for(int fold = 1; fold <= config.numFolds; fold++){
+			def wl = (fold % config.numFolds) + 1
+			DrugInteractionFold df = new DrugInteractionFold(fold, wl);
 
-			if(config.doWeightLearning){ 
+			if(config.createNewDataStore){
+				this.loadInteractionsData(config,data, df, true);
+				this.blockSimilarityData(config, data, df);
+			}
+			else{
+				this.resetDataForFold(config, data, df);
+			}
+
+			if(config.doWeightLearning){
 				this.learnWeights(m,data,config,df, 1);
 			}
 			this.runInference(m,data,config,df, df.cvTest, df.cvTrain, df.cvSim);
 
 			this.evaluateResults(data,config,df,de, df.cvTruth, df.cvTest, false);
 
-	  	}
-	  	
-	  	data.close();
+		}
 
-	  	return de;
+		data.close();
 
-  	}
+		return de;
 
-	  static void main(args){
+	}
 
-	  	String[] experiments = ['all_dataset2', 'all_dataset1']
-	  	String[] interactionTypes = ['all'];
+	/**
+	 * DEFINES calling all functions
+	 */
+	static void main(args){
 
-	  	for(String exp: experiments){
-	  		def numDrugs = 315;
-	  		
-	  		if(exp == "all_dataset1"){
-	  			interactionTypes = ["crd", "ncrd"];
-	  			numDrugs = 807;
-	  		}
+		String[] experiments = ['all_dataset2', 'all_dataset1']
+		String[] interactionTypes = ['all'];
 
-	  		for(String it: interactionTypes){
-	  			def blockingNum = 15;
-	  			def blockingType = 5;
+		for(String exp: experiments){
+			def numDrugs = 315;
 
-	  			
-	  			if (it == "crd"){
-	  				blockingType = 3;
-	  			}
-	  			
+			if(exp == "all_dataset1"){
+				interactionTypes = ["crd", "ncrd"];
+				numDrugs = 807;
+			}
 
-	  			System.out.println("Working on interaction type " + it + " with blocking type " + blockingType);
-	  			def dip = new DrugInteractionPrediction();
-	  			def evaluation = dip.runExperiment(numDrugs, 10, exp, blockingNum, blockingType, it, true);
-	  			
-	  			dip.outputResultsCSV(it, exp, evaluation.AUC_Folds, "auc");
-	  			dip.outputResultsCSV(it, exp, evaluation.AUPR_N_Folds, "auprNeg");
-	  			dip.outputResultsCSV(it, exp, evaluation.AUPR_P_Folds, "auprPos");
+			for(String it: interactionTypes){
+				def blockingNum = 15;
+				def blockingType = 5;
 
-	  		}
-	  	}
-  	}
+
+				if (it == "crd"){
+					blockingType = 3;
+				}
+
+
+				System.out.println("Working on interaction type " + it + " with blocking type " + blockingType);
+				def dip = new DrugInteractionPrediction();
+				def evaluation = dip.runExperiment(numDrugs, 10, exp, blockingNum, blockingType, it, true);
+
+				dip.outputResultsCSV(it, exp, evaluation.AUC_Folds, "auc");
+				dip.outputResultsCSV(it, exp, evaluation.AUPR_N_Folds, "auprNeg");
+				dip.outputResultsCSV(it, exp, evaluation.AUPR_P_Folds, "auprPos");
+
+			}
+		}
+	}
 }
